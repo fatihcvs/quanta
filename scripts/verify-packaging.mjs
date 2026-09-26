@@ -48,7 +48,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
-const PACKAGES = ['core', 'react', 'devtools', 'vue', 'svelte', 'lit'];
+const PACKAGES = ['core', 'react', 'devtools', 'vue', 'svelte', 'lit', 'astro'];
 
 const run = (cmd, args, cwd) =>
     execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: 'pipe' });
@@ -75,11 +75,29 @@ try {
     const tarballs = {};
     for (const name of PACKAGES) {
         const dir = join(ROOT, 'packages', name);
-        run('npm', ['pack', '--pack-destination', workdir], dir);
-        const file = readdirSync(workdir).find(
-            (f) => f.startsWith(`quantajs-${name}-`) && f.endsWith('.tgz'),
+        const [packed] = JSON.parse(
+            run('npm', ['pack', '--json', '--pack-destination', workdir], dir),
         );
+        const file = packed?.filename;
         if (!file) throw new Error(`npm pack produced no tarball for ${name}`);
+
+        // The npm page renders the README, and MIT requires the notice to
+        // travel with the code.
+        const shipped = packed.files.map((f) => f.path.toLowerCase());
+        for (const required of ['readme.md', 'license']) {
+            if (!shipped.includes(required)) {
+                throw new Error(`@quantajs/${name} tarball has no ${required}`);
+            }
+        }
+        const manifest = JSON.parse(
+            readFileSync(join(dir, 'package.json'), 'utf8'),
+        );
+        if (manifest.repository?.directory !== `packages/${name}`) {
+            throw new Error(
+                `@quantajs/${name}: repository.directory must be packages/${name}`,
+            );
+        }
+
         tarballs[name] = join(workdir, file);
         log(`packed @quantajs/${name} -> ${file}`);
     }
@@ -627,6 +645,46 @@ export class Doubled extends LitElement {
     );
     run('npx', ['tsc', '-p', 'tsconfig.json'], litApp);
     log('lit type declarations: ok');
+
+    /* ---------------------------------------------------------------- *
+     * 11. @quantajs/astro: the integration and its middleware load as ES
+     *     modules, and every entry point resolves. Installed without its
+     *     `astro` peer, which it only needs for types.
+     * ---------------------------------------------------------------- */
+    const astroApp = join(workdir, 'astro-app');
+    mkdirSync(astroApp);
+    writeFileSync(
+        join(astroApp, 'package.json'),
+        JSON.stringify({
+            name: 'packaging-fixture-astro',
+            private: true,
+            version: '0.0.0',
+            type: 'module',
+            dependencies: {
+                '@quantajs/core': `file:${tarballs.core}`,
+                '@quantajs/astro': `file:${tarballs.astro}`,
+            },
+        }),
+    );
+    run('npm', ['install', '--no-audit', '--no-fund', '--legacy-peer-deps'], astroApp);
+    writeFileSync(
+        join(astroApp, 'check.mjs'),
+        `import quanta from '@quantajs/astro';
+import { onRequest } from '@quantajs/astro/middleware';
+
+const integration = quanta();
+if (integration.name !== '@quantajs/astro') {
+    throw new Error('the default export is not the integration');
+}
+if (typeof onRequest !== 'function') {
+    throw new Error('@quantajs/astro/middleware has no onRequest');
+}
+// The client runs in a browser; here it only has to resolve.
+import.meta.resolve('@quantajs/astro/client');
+console.log('astro integration, middleware and client: ok');
+`,
+    );
+    log(run('node', ['check.mjs'], astroApp).trim());
 
     log('\npackaging verification passed');
 } catch (error) {

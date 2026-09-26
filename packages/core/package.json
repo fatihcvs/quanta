@@ -19,13 +19,14 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/quanta-js/quanta.git"
+        "url": "git+https://github.com/quanta-js/quanta.git",
+        "directory": "packages/core"
     },
     "bugs": {
         "url": "https://github.com/quanta-js/quanta/issues"
     },
     "homepage": "https://quantajs.com",
-    "version": "2.3.0",
+    "version": "3.0.0",
     "type": "module",
     "license": "MIT",
     "scripts": {

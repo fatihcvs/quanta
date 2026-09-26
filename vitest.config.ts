@@ -69,8 +69,6 @@ export default defineConfig({
                 '**/index.ts',
                 // Pure type definition files (no runtime code)
                 'packages/core/src/type/**',
-                // DOM-only adapters (require real browser APIs)
-                'packages/core/src/persistence/adapters/**',
                 // DevTools React component (requires full Preact runtime)
                 'packages/react/src/components/QuantaDevTools.tsx',
                 // Large UI surfaces intentionally validated via targeted runtime tests
@@ -97,6 +95,7 @@ export default defineConfig({
             '@quantajs/vue': path.resolve(__dirname, 'packages/vue/src'),
             '@quantajs/svelte': path.resolve(__dirname, 'packages/svelte/src'),
             '@quantajs/lit': path.resolve(__dirname, 'packages/lit/src'),
+            '@quantajs/astro': path.resolve(__dirname, 'packages/astro/src'),
             '@quantajs/devtools': path.resolve(
                 __dirname,
                 'packages/devtools/src',
